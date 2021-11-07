@@ -1,0 +1,281 @@
+---
+title: 'R Project 1: Analysis of Olympic Games data'
+author: "Oxana Kolpakova"
+date: "06 11 2021"
+output: html_document
+---
+For many years, the Olympic Games have been held all over the world, and participants from all over the world compete for success in various sports.
+In this project, we will correct the incoming data, analyze it according to several required  parameters and make EDA
+
+Specifying the working directory.
+```{r}
+#setwd("C:/Users/1/Desktop/olimpic_games_folder")
+```
+Load the necessary libraries. 
+```{r message=FALSE}
+library(plyr) 
+library(dplyr)
+library(ggplot2)
+library(GenomicRanges)
+library(doBy)
+library(tidyverse) 
+library(foreign)
+library(cowplot)
+```
+Removing workspace stuff.
+
+```{r}
+rm(list = ls())
+```
+1. Import data sets. We merged all *.csv files into one table
+```{r}
+Olimpic_Games <- rbind(ldply(list.files(path = "C:/Users/1/Desktop/olimpic_games_folder/data_folder/raw_data", pattern = "*.csv", full.names=TRUE), read.csv))
+```
+Look at our data 
+```{r}
+str(Olimpic_Games)
+```
+This is a historical   on the modern Olympic Games, including all the Games from Athens 1896 to Rio 2016. The athlete events dataset contains information about Olympic Athletes and events that they have competed in, including biological data (Age, Sex, Height, Weight etc.) and event data (Year, Season, City, Sport etc.). The NOC (National Organizing Committee) regions dataset possesses information about the countries that compete in the Olympics, including the country name and any notes about said country.
+
+The file athlete_events.csv contains 271115 rows and 15 columns. Each row corresponds to an individual athlete competing in an individual Olympic event.
+
+The Athletes dataset contains 15 variables:
+
+ID: A number used as a unique identifier for each athlete  
+Name: The athlete’s name(s) in the form of First Middle Last where available  
+Sex: The athlete’s gender; one of M or F Age: The athlete’s age in years  
+Height: The athlete’s height in centimeters (cm)  
+Weight: The athlete’s weight in kilograms (kg)  
+Team: The name of the team that the athlete competed for  
+NOC: The National Organizing Committee’s 3-letter code  
+Games: The year and season of the Olympics the athlete competed in in the format YYYY Season  
+Year: The year of the Olympics that the athlete competed in  
+Season: The season of the Olympics that the athlete competed in  
+City: The city that hosted the Olympics that the athlete competed in  
+Sport: The sport that the athlete competed in  
+Event: The event that the athlete competed in  
+Medal: The medal won by the athlete; one of Gold, Silver, or Bronze. NA if no medal was won.  
+
+2. Check whether there are missed or non-valid values.
+
+```{collapse=TRUE}
+Olimpic_Games[Olimpic_Games == ""] <- "NA"
+# Sex
+unique(Olimpic_Games[3]) #looking for unique
+Olimpic_Games$Sex[Olimpic_Games$Sex == "G"] <- "NA" #correct the slip
+Olimpic_Games$Sex <- factor(Olimpic_Games$Sex) #change data type to factor
+# Age
+unique(Olimpic_Games[4])
+Olimpic_Games$Age[Olimpic_Games$Age == "240"] <- "NA" #remove outliers 
+Olimpic_Games$Age <- as.integer(Olimpic_Games$Age) # change data type to int
+# Height
+unique(Olimpic_Games[5])
+Olimpic_Games$Height[Olimpic_Games$Height == "340"] <- "NA" #remove outliers 
+Olimpic_Games$Height <- as.integer(Olimpic_Games$Height) # change data type to int
+# Weight 
+unique(Olimpic_Games[6])
+Olimpic_Games$Weight[Olimpic_Games$Weight <= 20] <- "NA"#remove outliers 
+Olimpic_Games$Weight <- as.numeric(Olimpic_Games$Weight) # change data type to num
+# NOC
+unique(Olimpic_Games[8])
+Olimpic_Games$NOC[Olimpic_Games$NOC == "JPN"] <- "JP" #correct the slip
+Olimpic_Games$NOC <- factor(Olimpic_Games$NOC) #change data type to factor
+# Games
+unique(Olimpic_Games[9])
+Olimpic_Games$Games[Olimpic_Games$Games == "2000 Su"] <- "2000 Summer"
+Olimpic_Games$Games[Olimpic_Games$Games == "2004 Summe"] <- "2004 Summer" #correct the slip
+# Season
+unique(Olimpic_Games[11])
+Olimpic_Games$Season <- factor(Olimpic_Games$Season) #change data type to factor
+# City
+unique(Olimpic_Games[12])
+Olimpic_Games$City[Olimpic_Games$City == "Moskva"] <- "Moscow" #correct the slip
+# Sport
+unique(Olimpic_Games[13])
+Olimpic_Games$Sport[Olimpic_Games$Sport == "Footba"] <- "Football" #correct the slip
+# Event 
+unique(Olimpic_Games[14])
+# Medal
+unique(Olimpic_Games[15])
+Olimpic_Games$Medal[Olimpic_Games$Medal == "<NA>"] <- "NA"
+Olimpic_Games$Medal <- factor(Olimpic_Games$Medal) #change data type to factor
+```
+Data is fixed. Now let’s write the data to file processed_data.csv and take a look at the second one:
+```{r}
+write.csv(Olimpic_Games, 'C:/Users/1/Desktop/olimpic_games_folder/data_folder/processed_data/processed_data.csv', row.names = FALSE)
+Olimpic_Games <- read.csv(file='C:/Users/1/Desktop/olimpic_games_folder/data_folder/processed_data/processed_data.csv',header=T, )
+str(Olimpic_Games)
+```
+Some descriptive statistics.
+```{r}
+summary(Olimpic_Games)
+```
+We will answer the questions asked by the project.  
+3. Age of youngest athletes of both genders at the 1992 Olympics. 
+```{r}
+min(subset(Olimpic_Games, Year == 1992 & Sex == "M" )[,4], na.rm=T)
+min(subset(Olimpic_Games, Year == 1992 & Sex == "F" )[,4], na.rm=T)
+```
+4. Mean and standard deviation of type Height for
+athletes of every gender.
+```{r}
+mean(subset(Olimpic_Games, Sex == "M")[,5], na.rm = T) 
+sd(subset(Olimpic_Games, Sex == "M")[,5], na.rm = T) 
+mean(subset(Olimpic_Games, Sex == "F")[,5], na.rm = T) 
+sd(subset(Olimpic_Games, Sex == "F")[,5], na.rm = T) 
+
+```
+5. Mean and standard deviation of female tennis players' height at the 2000 Olympics. 
+```{r}
+round(mean(subset(Olimpic_Games, Year == 2000 & Sex == "F")[,5], na.rm = T), digits=1)
+```
+6. What sport did the heaviest athlete participate in at the 2006 Olympics?
+```{r}
+Weight_max <- max(subset(Olimpic_Games, Year == 2006)[,6], na.rm = T)
+subset(Olimpic_Games, Year == 2006 & Weight == Weight_max)[,13]
+```
+7. How many gold medals were won by women from 1980 to 2010? 
+```{r}
+nrow(subset(Olimpic_Games, Year >= 1980 & Year <= 2010 & Medal == "Gold"))
+```
+8. How many times has athlete John Aalberg competed in the Olympics over the years?
+```{r}
+years<- unique(subset(Olimpic_Games, Name == "John Aalberg")[,10])
+length(years)
+```
+9. The least  and most represented by the number of participants age groups of athletes at the 2008 Olympics. Possible age groups: [15-25), [25-35), [35-45), [45-55]. 
+```{r}
+cat1 <- nrow(subset(Olimpic_Games, Year == 2008 & Age >= 15 & Age < 25))
+cat2 <- nrow(subset(Olimpic_Games, Year == 2008 & Age >= 25 & Age < 35))
+cat3 <- nrow(subset(Olimpic_Games, Year == 2008 & Age >= 35 & Age < 45))
+cat4 <- nrow(subset(Olimpic_Games, Year == 2008 & Age >= 45 & Age < 55))
+which.min(c(cat1, cat2, cat3, cat4))
+which.max(c(cat1, cat2, cat3, cat4))
+```
+10. How has the number of sports in the 2002 Olympics changed from the 1994 Olympics?
+```{r}
+nums1 <- length(unique(subset(Olimpic_Games, Year == 2008)[,13]))
+nums2 <- length(unique(subset(Olimpic_Games, Year == 1994)[,13]))
+abs(nums1 - nums2)
+
+```
+11. 3 Top of countries for each type of medal for the Winter and Summer Olympic Games 
+```{r}
+Only_gold_S <- subset(Olimpic_Games, Season == "Summer" & Medal == "Gold")
+Only_silver_S <- subset(Olimpic_Games, Season == "Summer" & Medal == "Silver")
+Only_bronze_S <- subset(Olimpic_Games, Season == "Summer" & Medal == "Bronze")
+topG_S <- aggregate(Medal ~ NOC, data = Only_gold_S, FUN = length)
+topS_S <- aggregate(Medal ~ NOC, data = Only_silver_S, FUN = length)
+topB_S <- aggregate(Medal ~ NOC, data = Only_bronze_S, FUN = length)
+# Top of Gold Medal for Summer
+head(topG_S[with(topG_S, order(-Medal)), ], 3)[,1]
+# Top of Silver Medal for Summer
+head(topS_S[with(topS_S, order(-Medal)), ], 3)[,1]
+# Top of Bronzal Medal for Summer
+head(topB_S[with(topB_S, order(-Medal)), ], 3)[,1]
+
+Only_gold_W <- subset(Olimpic_Games, Season == "Winter" & Medal == "Gold")
+Only_silver_W <- subset(Olimpic_Games, Season == "Winter" & Medal == "Silver")
+Only_bronze_W <- subset(Olimpic_Games, Season == "Winter" & Medal == "Bronze")
+topG_W <- aggregate(Medal ~ NOC, data = Only_gold_W, FUN = length)
+topS_W <- aggregate(Medal ~ NOC, data = Only_silver_W, FUN = length)
+topB_W <- aggregate(Medal ~ NOC, data = Only_bronze_W, FUN = length)
+# Top of Gold Medal for Winter
+head(topG_W[with(topG_W, order(-Medal)), ], 3)[,1]
+# Top of Silver Medal for Winter
+head(topS_W[with(topS_W, order(-Medal)), ], 3)[,1]
+# Top of Bronzal Medal for Winter
+head(topB_W[with(topB_W, order(-Medal)), ], 3)[,1]
+```
+12. Create a new variable Height_z_scores and store the values of the Height variable in it after it's standardized. 
+```{r}
+Height_z_scores <- (Olimpic_Games$Height - mean(Olimpic_Games$Height, na.rm = T))/sd(Olimpic_Games$Height, na.rm = T)
+
+```
+13. Create a new variable Height_min_max_scaled and
+store the values of the Height variable into it after applying min-max normalization to it.
+```{r}
+Height_min_max_scaled <- (Olimpic_Games$Height - min(Olimpic_Games$Height, na.rm = T)) / (max(Olimpic_Games$Height, na.rm = T) - min(Olimpic_Games$Height, na.rm = T))
+```
+14. Compare the height, weight and ages of men and women who competed in the Winter Olympics.
+```{r, warning=FALSE}
+library(cowplot)
+OGW <- subset(Olimpic_Games, Season == "Winter")
+OGW1 <- (ggplot(data = OGW, aes(x = Sex, y = Height, fill = Sex)) +
+  geom_boxplot() +
+  ggtitle("Height distribution "))
+OGW2 <- (ggplot(data = OGW, aes(x = Sex, y = Weight, fill = Sex, )) +
+  geom_boxplot()+
+  ggtitle("Weight distribution "))
+OGW3 <- ggplot(data = OGW, aes(x = Sex, y = Age, fill = Sex)) +
+  geom_boxplot()+
+  ggtitle("Age distribution ")
+plot_grid(OGW1, OGW2, OGW3)
+```
+
+15. Whether there is a correlation between the variables Team and Medal?
+
+```{r}
+cor_Olimpic_Games <- Olimpic_Games
+cor_Olimpic_Games$Medal <- factor(cor_Olimpic_Games$Medal, labels = c("1", "2", "3", "4"))
+cor_Olimpic_Games$Medal <- as.numeric(cor_Olimpic_Games$Medal)
+cor_Olimpic_Games$Team <- factor(cor_Olimpic_Games$Team)
+cor_Olimpic_Games$Team <- as.numeric(cor_Olimpic_Games$Team)
+
+T_M <- cor.test(cor_Olimpic_Games$Team, cor_Olimpic_Games$Medal, method="kendall")
+T_M
+
+
+```
+The relationship between the number of medals and their types for each team is traced. Let's take swimming, for example. These countries have more medals than other countries for political reasons. We choose the histogram because we want to clearly see the distribution of medals and also determine what type of medals the country won.
+```{r, warning=FALSE}
+swim <- Olimpic_Games %>% 
+  filter(Sport == "Swimming") %>%
+  select(Name, Sex, Age, Team, NOC, Year, City, Event, Medal)
+
+# Count Events, Nations, and Swimming competitions each year
+counts_swim <- swim %>% filter(Team != "Unknown") %>%
+  group_by(Year) %>%
+  summarize(
+    Events = length(unique(Event)),
+    Nations = length(unique(Team)),
+    Swimmings = length(unique(Name))
+  )
+
+swim <- Olimpic_Games %>% 
+  filter(Sport == "Swimming") %>%
+  select(Name, Sex, Age, Team, NOC, Year, City, Event, Medal)
+
+# Count Events, Nations, and Swimming competitions each year
+counts_swim <- swim %>% filter(Team != "Unknown") %>%
+  group_by(Year) %>%
+  summarize(
+    Events = length(unique(Event)),
+    Nations = length(unique(Team)),
+    Swimmings = length(unique(Name))
+  )
+
+# count number of medals awarded to each Team
+medal_counts_swim <- swim %>% filter(!is.na(Medal))%>%
+  group_by(Team, Medal) %>%
+  summarize(Count=length(Medal)) 
+
+#plot
+ggplot(medal_counts_swim, aes(x=Team, y=Count, fill=Medal)) +
+  geom_col() +
+  coord_flip() +
+  ggtitle("Medal counts for Swimming Competitions") +
+  theme(plot.title = element_text(hjust = 0.5))
+```
+
+
+16. EDA. 
+Let's build a linear regression model of the relationship between the number of medals, gender and age.
+```{r, warning=FALSE}
+#fit <- lm(Medal ~ Age + Sex, data = na.omit(Olimpic_Games))
+#summary(fit)
+ggplot(Olimpic_Games, aes(x = Age, y = Medal, col = Sex)) + 
+  geom_point()  + 
+  geom_smooth(method = 'lm')
+```
+```
