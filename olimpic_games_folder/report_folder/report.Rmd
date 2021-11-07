@@ -9,7 +9,7 @@ In this project, we will correct the incoming data, analyze it according to seve
 
 Specifying the working directory.
 ```{r}
-#setwd("C:/Users/1/Desktop/olimpic_games_folder")
+setwd("https://github.com/OxanaKolpakova/BI_Stat_2021/olimpic_games_folder/data_folder/raw_data/")
 ```
 Load the necessary libraries. 
 ```{r message=FALSE}
@@ -29,7 +29,7 @@ rm(list = ls())
 ```
 1. Import data sets. We merged all *.csv files into one table
 ```{r}
-Olimpic_Games <- rbind(ldply(list.files(path = "C:/Users/1/Desktop/olimpic_games_folder/data_folder/raw_data", pattern = "*.csv", full.names=TRUE), read.csv))
+Olimpic_Games <- rbind(ldply(list.files(path = "https://github.com/OxanaKolpakova/BI_Stat_2021/olimpic_games_folder/data_folder/raw_data/", pattern = "*.csv", full.names=TRUE), read.csv))
 ```
 Look at our data 
 ```{r}
@@ -102,8 +102,8 @@ Olimpic_Games$Medal <- factor(Olimpic_Games$Medal) #change data type to factor
 ```
 Data is fixed. Now let’s write the data to file processed_data.csv and take a look at the second one:
 ```{r}
-write.csv(Olimpic_Games, 'C:/Users/1/Desktop/olimpic_games_folder/data_folder/processed_data/processed_data.csv', row.names = FALSE)
-Olimpic_Games <- read.csv(file='C:/Users/1/Desktop/olimpic_games_folder/data_folder/processed_data/processed_data.csv',header=T, )
+write.csv(Olimpic_Games, 'https://github.com/OxanaKolpakova/BI_Stat_2021/olimpic_games_folder/data_folder/processed_data/', row.names = FALSE)
+Olimpic_Games <- read.csv(file='https://github.com/OxanaKolpakova/BI_Stat_2021/olimpic_games_folder/data_folder/processed_data/processed_data.csv',header=T, )
 str(Olimpic_Games)
 ```
 Some descriptive statistics.
