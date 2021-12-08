@@ -1,0 +1,167 @@
+---
+title: "PCA"
+author: "Oxana Kolpakova"
+date: "06 12 2021"
+output:
+  html_document: default
+  pdf_document: default
+---
+We need to predict the critical temperature of the superconductor (column critical_temp) from various characteristics of the substance and its composition (all other columns).
+
+Load the necessary libraries. 
+```{r include=FALSE}
+library(tidyverse)
+library(readxl)
+library(caret)
+library(factoextra)
+library(psych)
+library(vegan)
+library(caTools)
+library(kernlab)
+library(RcppCNPy)
+library(preputils)
+```
+Removing workspace stuff.
+```{r}
+rm(list = ls())
+```
+Specify the URL of the archive.
+```{r}
+url_zip <- "https://archive.ics.uci.edu/ml/machine-learning-databases/00464/superconduct.zip"
+```
+Download and unzip data.
+```{r}
+path_unzip <- "C:/Users/1/Desktop/unzipped/data_archive.zip"
+ifelse(!file.exists(path_unzip), 
+       download.file(url_zip, path_unzip, mode="wb"), 
+       'file alredy exists')
+unzip(path_unzip, exdir = "C:/Users/1/Desktop/unzipped/.")
+```
+Import data.
+```{r include=FALSE}
+train <- read_csv("C:/Users/1/Desktop/unzipped/train.csv", col_names = TRUE)
+unique_m <- read_csv("C:/Users/1/Desktop/unzipped/unique_m.csv", col_names = TRUE)
+```
+Delete the column materials.
+```{r}
+unique_m = unique_m[,-88] 
+```
+Combine files into one table and look.
+```{r}
+data1 <- cbind(train,unique_m )
+```
+Delete dependent dublicate "critical_temp" column.
+```{r include=FALSE}
+which(colnames(data1)=="critical_temp")
+data2 <- data1[ ,-82]
+which(colnames(data2)=="critical_temp")
+```
+Remove predictors with near-zero variance.
+```{r include=FALSE}
+nz = nearZeroVar(data2)
+data2 = data2[, -nz]
+#str(data2)
+```
+Divide data into training and test samples.
+```{r}
+set.seed(101) 
+# create a vector with randomly selected observation numbers 
+tr.index = sample(1:nrow(data2), nrow(data2)*0.8) 
+ 
+#form a training sample,80%
+trSet = data2[tr.index, ]
+
+#form a control sample, 20%
+testSet = data2[-tr.index, ]
+```
+Performe z-standardization on the training set as the preProcess() function:
+method = "center" subtracts the mean from the predictors, method = "scale" divides them by the standard deviation.
+
+!The * _forLM sets contain the critical_temp variable.
+!The * _forPCA sets do not contain the critical_temp variable. 
+```{r include=FALSE}
+which(colnames(data2)=="critical_temp")
+trans_forPCA = preProcess(trSet[ ,-87], method = c("center", "scale"))
+trans_forLm = preProcess(trSet, method = c("center", "scale"))
+```
+To apply transformations taking into account these estimated parameters, use the predict() function 
+```{r include=FALSE}
+trSet_forPCA  = predict(trans_forPCA, trSet[ ,-87])
+#summary(trSet_forPCA)
+trSet_forLM = predict(trans_forLm, trSet)
+
+testSet_forPCA  = predict(trans_forPCA, testSet[ ,-87])
+#summary(testSet_forPCA)
+testSet_forLM = predict(trans_forLm, testSet)
+```
+Make a linear model that predicts the critical temperature for all available predictors, look at the adjusted R-squared.
+```{r echo=TRUE}
+model <- lm(critical_temp ~ ., data=trSet_forLM)
+#summmary(model)
+summary(model)$adj.r.squared
+```
+Apply PCA to reduce the number of predictors and improve the quality of the multiple linear regression model. Get the coefficients for the principal components from the training set.
+```{r}
+pca_train <- prcomp(testSet_forPCA)
+pca_train1 <- rda(testSet_forPCA)
+```
+How many PC components should we leave?
+```{r echo=TRUE}
+fviz_eig(pca_train)
+#summary (pca_train)#  PC8 explains 79% of variance 
+screeplot(pca_train, type = "lines", bstick = TRUE) # it is necessary to leave PC8 
+```
+Extract PCs. 
+```{r}
+pca_scores<- as.data.frame(scores(pca_train, display = "species", choices = c(1:8), scaling = 0))
+#str(pca_scores)
+```
+Transforming train and test sets with coefficients from train sample.
+```{r}
+trans_train_pca <- as.data.frame(as.matrix(trSet_forPCA) %*% as.matrix(pca_scores))
+
+trans_test_pca <- as.data.frame(as.matrix(testSet_forPCA) %*% as.matrix(pca_scores))
+
+trans_train_pca <- cbind(trans_train_pca, trSet_forLM[87])
+trans_test_pca <- cbind(trans_test_pca, testSet_forLM[87])
+#str(trans_test_pca)
+```
+Make new linear model.
+```{r}
+#model <- lm(critical_temp ~ ., data=trSet_forLM)
+postPCA_model <- lm(critical_temp~., data=trans_test_pca)
+#summary(postPCA_model)
+summary(postPCA_model)$adj.r.squared # linear model got worse((
+
+```
+#To improve the model, we decided to run a kernel PCA.
+#We ran out of memory for analysis.
+```{r}
+#kpca = kpca(~., data = trSet_forPCA, kernel = 'rbfdot', features = 2)
+```
+Download file of kernelPCs courtesy by Danil Linvinov
+```{r include=FALSE}
+kernel_pcs <- npyLoad("C:/Users/1/Desktop/X_kpca.npy")
+```
+Take recommended 5PCs and transform data:
+```{r eval=FALSE, include=FALSE}
+PCs_kernel <- as.data.frame(pcv(kernel_pcs))[1:5]
+#str(PCs_kernel)
+
+#trans_test_kernel <- as.data.frame(as.matrix(testSet_forPCA %*% as.matrix(PCs_kernel))
+#str(trans_test_kernel)
+#trans_test_kernel <- cbind(trans_test_kernel, testSet_forLM[87])
+```
+#I did not complete the analysis because
+#I could not convert the PCs_kernel% *% #testSet_forPCA matrix.
+#The provided X_kpca.npy file and my testSet_forPCA 
+#have different number of observations.
+#I could not quickly solve this problem ((
+#I wrote code for further analysis. 
+
+#Linear modal with transformed data. 
+```{r}
+#kernel_model <- lm(critical_temp~., data = trans_test_kernel)
+#summary(kernel_model)
+#summary(postPCA_model)$adj.r.squared
+```
